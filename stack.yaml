@@ -33,7 +33,7 @@ packages:
 - .
 
 extra-deps:
-  - portray-0.2.0
+  - ../hs/portray/portray
   - portray-diff-0.1.0.1
   - portray-prettyprinter-0.2.0
   - rle-0.1.0.1

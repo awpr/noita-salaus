@@ -38,7 +38,7 @@ import Salaus.Symbol
 
 _ = messages
 
-type Histogram a = KM.IntMap a Int
+type Histogram a = KM.IntMap a (Sum Int)
 type Distribution a = KM.IntMap a Float
 
 -- An IntMap containing the single mapping i => 1
@@ -57,10 +57,10 @@ histogram xs = coerce $ foldr (\x m -> insertm x (Sum @Int 1) m) KM.empty xs
 histogram' :: Ord a => [a] -> M.Map a Int
 histogram' xs = coerce $ foldr (\x m -> insertm' x (Sum @Int 1) m) M.empty xs
 
-toDistribution :: (Functor f, Foldable f) => f Int -> f Float
-toDistribution h = fmap (\x -> fromIntegral x / n) h
+toDistribution :: (Functor f, Foldable f) => f (Sum Int) -> f Float
+toDistribution h = fmap (\ (Sum x) -> fromIntegral x / n) h
  where
-  n = fromIntegral $ sum h
+  n = fromIntegral $ getSum $ sum h
 
 freqs :: a ⊆ Int => [a] -> Distribution a
 freqs = toDistribution . histogram
@@ -86,7 +86,7 @@ getRate (RateStats c t) = fromIntegral c / fromIntegral t
 -- gamma rate-of-coincidence: the expected rate of coincidence of text
 -- generated randomly from the distribution.
 gammaRoC' :: Histogram a -> RateStats
-gammaRoC' h = RateStats (getSum $ foldMap (Sum . square) h) (square (sum h))
+gammaRoC' h = RateStats (getSum $ foldMap square h) (getSum $ square (sum h))
 
 gammaRoC :: Histogram a -> Float
 gammaRoC = getRate . gammaRoC'
@@ -105,7 +105,7 @@ gammaIoC h = gammaRoC h / uniformRoC @n
 -- delta rate-of-coincidence: the rate of coincidences of pairs drawn without
 -- replacement from a sample.
 deltaRoC' :: Histogram a -> RateStats
-deltaRoC' h = RateStats (getSum $ foldMap (\x -> Sum (x * (x - 1))) h) (n * (n - 1))
+deltaRoC' h = RateStats (getSum $ foldMap (\x -> x * (x - 1)) h) (getSum $ n * (n - 1))
  where
   n = sum h
 
@@ -115,6 +115,12 @@ deltaRoC = getRate . deltaRoC'
 -- delta index of coincidence
 deltaIoC :: forall n. KnownNat n => Histogram (Symbol n) -> Float
 deltaIoC h = deltaRoC h / uniformRoC @n
+
+kappaRoC :: [Histogram a] -> Float
+kappaRoC = getRate . foldMap deltaRoC'
+
+kappaIoC :: forall n. KnownNat n => [Histogram (Symbol n)] -> Float
+kappaIoC h = kappaRoC h / uniformRoC @n
 
 deltas :: [Int] -> [Int]
 deltas [] = []
@@ -165,7 +171,7 @@ toDigitGrid :: KnownNat n => [Histogram (Symbol n)] -> String
 toDigitGrid = unlines . map toRow
  where
   toRow hist =
-    [ case KM.lookup i hist of Nothing -> ' '; Just n -> chr (n + ord '0')
+    [ case KM.lookup i hist of Nothing -> ' '; Just n -> chr (getSum n + ord '0')
     | i <- alphabet
     ]
 
@@ -208,20 +214,20 @@ toHeatmap scale rows =
 
   sigmoid x = 1 / (1 + exp (- 2 * (x - 1)))
 
-  freqBrightness total ct = quantize $ sigmoid $ fromIntegral (k * ct) / total
+  freqBrightness total ct = quantize $ sigmoid $ fromIntegral (k * getSum ct) / total
 
   vecRows = V.fromList rows
 
   vecSums :: V.Vector Float
-  vecSums = fromIntegral . sum <$> vecRows
+  vecSums = fromIntegral . getSum . sum <$> vecRows
 
 viewImage :: Image Pixel8 -> IO ()
 viewImage img = do
-  writePng "test.png" img
-  callCommand "feh test.png"
+  writePng "/tmp/test.png" img
+  callCommand "feh /tmp/test.png"
 
 dotProduct :: a ⊆ Int => Histogram a -> Histogram a -> Int
-dotProduct xs ys = sum $ KM.intersectionWith (*) xs ys
+dotProduct xs ys = getSum $ sum $ KM.intersectionWith (*) xs ys
 
 similarityMatrix :: a ⊆ Int => [Histogram a] -> [[Int]]
 similarityMatrix countss = countss <&> \counts -> dotProduct counts <$> countss
@@ -307,7 +313,7 @@ shuffleCorpus ms =
 randomCorpus :: forall n. KnownNat n => Int -> Int -> IO [[Symbol n]]
 randomCorpus n m =
   replicateM n $ replicateM m $
-    intToSymbol <$> randomRIO (0, fromIntegral $ natVal @n Proxy)
+    intToSymbol <$> randomRIO (0, fromIntegral $ natVal @n Proxy - 1)
 
 -- Read a corpus linewise from a text file, stripping spaces.
 readCorpus :: String -> IO [String]
