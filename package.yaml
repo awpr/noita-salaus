@@ -35,6 +35,9 @@ dependencies:
 - short-vec
 - keyed-containers
 - attenuation
+- Chart
+- Chart-diagrams
+- data-default
 
 library:
   source-dirs: src
