@@ -1,0 +1,4 @@
+.stack-work/
+*~
+noita.cabal
+stack.yaml.lock
