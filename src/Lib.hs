@@ -1,7 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
@@ -25,7 +23,6 @@ import Data.Maybe (listToMaybe, fromMaybe)
 import Data.Proxy (Proxy(..))
 import Data.Semigroup (Sum(..), Max(..), Arg(..))
 import Data.Vector qualified as V
-import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import GHC.TypeNats (KnownNat, natVal)
 import System.Process (callCommand)
@@ -38,70 +35,13 @@ import Data.Fin.Int (Fin, (-%), (+%), enumFin, fin)
 import Data.IntMap.Keyed qualified as KM
 import Data.RLE qualified as RLE
 import Data.Type.Attenuation (type (⊆))
-import Data.Portray (Portray)
-import Data.Wrapped (Wrapped(..))
 
 import Data
+import Salaus.Coincidence
 import Salaus.Distribution
 import Salaus.Symbol
 
 _ = messages
-
-square :: Num a => a -> a
-square x = x * x
-
--- Like Ratio, but not normalized.
-data RateStats = Int :/ Int
-  deriving (Eq, Ord, Read, Show, Generic)
-  deriving Portray via Wrapped Generic RateStats
-
-instance Semigroup RateStats where
-  (x :/ y) <> (z :/ w) = (x + z) :/ (y + w)
-
-instance Monoid RateStats where
-  mempty = 0 :/ 0
-
-getRate :: RateStats -> Float
-getRate (c :/ t) = fromIntegral c / fromIntegral t
-
--- gamma rate-of-coincidence: the expected rate of coincidence of text
--- generated randomly from the distribution.
-gammaRoC' :: Histogram a -> RateStats
-gammaRoC' h = getSum (foldMap square h) :/ getSum (square (sum h))
-
-gammaRoC :: Histogram a -> Float
-gammaRoC = getRate . gammaRoC'
-
-ones :: KnownNat n => Histogram (Symbol n)
-ones = histogram alphabet
-
--- rate of coincidence of uniform random data with N symbols
-uniformRoC :: forall n. KnownNat n => Float
-uniformRoC = gammaRoC (ones @n)
-
--- gamma index of coincidence
-gammaIoC :: forall n. KnownNat n => Histogram (Symbol n) -> Float
-gammaIoC h = gammaRoC h / uniformRoC @n
-
--- delta rate-of-coincidence: the rate of coincidences of pairs drawn without
--- replacement from a sample.
-deltaRoC' :: Foldable f => f (Sum Int) -> RateStats
-deltaRoC' h = getSum (foldMap (\x -> x * (x - 1)) h) :/ getSum (n * (n - 1))
- where
-  n = sum h
-
-deltaRoC :: Foldable f => f (Sum Int) -> Float
-deltaRoC = getRate . deltaRoC'
-
--- delta index of coincidence
-deltaIoC :: forall n. KnownNat n => Histogram (Symbol n) -> Float
-deltaIoC h = deltaRoC h / uniformRoC @n
-
-kappaRoC :: [Histogram a] -> Float
-kappaRoC = getRate . foldMap deltaRoC'
-
-kappaIoC :: forall n. KnownNat n => [Histogram (Symbol n)] -> Float
-kappaIoC h = kappaRoC h / uniformRoC @n
 
 deltas :: [Int] -> [Int]
 deltas [] = []
