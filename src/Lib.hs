@@ -1,4 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
@@ -22,6 +25,7 @@ import Data.Maybe (listToMaybe, fromMaybe)
 import Data.Proxy (Proxy(..))
 import Data.Semigroup (Sum(..), Max(..), Arg(..))
 import Data.Vector qualified as V
+import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import GHC.TypeNats (KnownNat, natVal)
 import System.Process (callCommand)
@@ -34,6 +38,8 @@ import Data.Fin.Int (Fin, (-%), (+%), enumFin, fin)
 import Data.IntMap.Keyed qualified as KM
 import Data.RLE qualified as RLE
 import Data.Type.Attenuation (type (⊆))
+import Data.Portray (Portray)
+import Data.Wrapped (Wrapped(..))
 
 import Data
 import Salaus.Distribution
@@ -44,22 +50,24 @@ _ = messages
 square :: Num a => a -> a
 square x = x * x
 
-data RateStats = RateStats { rsCount :: !Int, rsTests :: !Int }
-  deriving Show
+-- Like Ratio, but not normalized.
+data RateStats = Int :/ Int
+  deriving (Eq, Ord, Read, Show, Generic)
+  deriving Portray via Wrapped Generic RateStats
 
 instance Semigroup RateStats where
-  RateStats x y <> RateStats z w = RateStats (x + z) (y + w)
+  (x :/ y) <> (z :/ w) = (x + z) :/ (y + w)
 
 instance Monoid RateStats where
-  mempty = RateStats 0 0
+  mempty = 0 :/ 0
 
 getRate :: RateStats -> Float
-getRate (RateStats c t) = fromIntegral c / fromIntegral t
+getRate (c :/ t) = fromIntegral c / fromIntegral t
 
 -- gamma rate-of-coincidence: the expected rate of coincidence of text
 -- generated randomly from the distribution.
 gammaRoC' :: Histogram a -> RateStats
-gammaRoC' h = RateStats (getSum $ foldMap square h) (getSum $ square (sum h))
+gammaRoC' h = getSum (foldMap square h) :/ getSum (square (sum h))
 
 gammaRoC :: Histogram a -> Float
 gammaRoC = getRate . gammaRoC'
@@ -78,7 +86,7 @@ gammaIoC h = gammaRoC h / uniformRoC @n
 -- delta rate-of-coincidence: the rate of coincidences of pairs drawn without
 -- replacement from a sample.
 deltaRoC' :: Foldable f => f (Sum Int) -> RateStats
-deltaRoC' h = RateStats (getSum $ foldMap (\x -> x * (x - 1)) h) (getSum $ n * (n - 1))
+deltaRoC' h = getSum (foldMap (\x -> x * (x - 1)) h) :/ getSum (n * (n - 1))
  where
   n = sum h
 
@@ -288,9 +296,12 @@ randomCorpus n m =
   replicateM n $ replicateM m $
     intToSymbol <$> randomRIO (0, fromIntegral $ natVal @n Proxy - 1)
 
--- Read a corpus linewise from a text file, stripping spaces.
-readCorpus :: String -> IO [String]
-readCorpus nm = readFile nm <&> filter (not . all isSpace) . lines
+asciiToSymbol :: Char -> Symbol 96
+asciiToSymbol c = intToSymbol (ord c - 32)
+
+-- Read a corpus linewise from a text file, stripping blank lines.
+readCorpus :: String -> IO [[Symbol 96]]
+readCorpus nm = readFile nm <&> map (map asciiToSymbol) . filter (not . all isSpace) . lines
 
 argMax :: (HasCallStack, Foldable f, Ord b) => (a -> b) -> f a -> a
 argMax f = (\ (Arg _ x) -> x) . getMax . fromMaybe (error "") . foldMap (\x -> Just $ Max $ Arg (f x) x)

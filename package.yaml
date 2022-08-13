@@ -31,6 +31,7 @@ dependencies:
 - Chart
 - Chart-diagrams
 - data-default
+- wrapped
 
 library:
   source-dirs: src
