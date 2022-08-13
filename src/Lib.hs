@@ -11,15 +11,18 @@
 module Lib where
 
 import Control.Monad (replicateM)
+import Data.Bifunctor (first)
 import Data.Char (chr, ord, isSpace)
+import Data.Foldable (fold)
 import Data.Functor ((<&>))
 import Data.IntMap qualified as IM
 import Data.List (mapAccumL, transpose, tails)
 import Data.Map.Strict qualified as M
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromMaybe)
 import Data.Proxy (Proxy(..))
-import Data.Semigroup (Sum(..))
+import Data.Semigroup (Sum(..), Max(..), Arg(..))
 import Data.Vector qualified as V
+import GHC.Stack (HasCallStack)
 import GHC.TypeNats (KnownNat, natVal)
 import System.Process (callCommand)
 import System.Random (randomRIO)
@@ -27,7 +30,7 @@ import System.Random (randomRIO)
 import Codec.Picture.Png (writePng)
 import Codec.Picture.Types (Pixel8, Image, generateImage)
 import System.Random.Shuffle (shuffleM)
-import Data.Fin.Int (Fin, (-%))
+import Data.Fin.Int (Fin, (-%), (+%), enumFin, fin)
 import Data.IntMap.Keyed qualified as KM
 import Data.RLE qualified as RLE
 import Data.Type.Attenuation (type (⊆))
@@ -289,6 +292,44 @@ randomCorpus n m =
 readCorpus :: String -> IO [String]
 readCorpus nm = readFile nm <&> filter (not . all isSpace) . lines
 
+argMax :: (HasCallStack, Foldable f, Ord b) => (a -> b) -> f a -> a
+argMax f = (\ (Arg _ x) -> x) . getMax . fromMaybe (error "") . foldMap (\x -> Just $ Max $ Arg (f x) x)
+
+argMaxFin :: (KnownNat n, Ord a) => (Fin n -> a) -> Fin n
+argMaxFin f = argMax f enumFin
+
+dotProductMod :: KnownNat n => Fin n -> Histogram (Symbol n) -> Histogram (Symbol n) -> Int
+dotProductMod k h1 h2 =
+  getSum $
+  foldMap
+    (\ i ->
+      (KM.findWithDefault 0 (Symbol i) h1) *
+      (KM.findWithDefault 0 (Symbol (i -% k)) h2))
+    enumFin
+
+bestAlignment :: KnownNat n => Histogram (Symbol n) -> Histogram (Symbol n) -> Fin n
+bestAlignment h1 h2 = argMaxFin (\k -> dotProductMod k h1 h2)
+
+rotateMod :: KnownNat n => Fin n -> Histogram (Symbol n) -> Histogram (Symbol n)
+rotateMod k = KM.fromList . map (first (\ (Symbol x) -> Symbol (x +% k))) . KM.toList
+
+alignmentSearch :: forall n. KnownNat n => Int -> [Histogram (Symbol n)] -> ([Fin n], Histogram (Symbol n))
+alignmentSearch fuel hs = go fuel (IM.fromList [(i, fin 0) | i <- [0 .. l - 1]]) (fold hs)
+ where
+  hsVec = V.fromList hs
+  l = V.length hsVec
+
+  go :: Int -> IM.IntMap (Fin n) -> Histogram (Symbol n) -> ([Fin n], Histogram (Symbol n))
+  go 0 offs overall = ([IM.findWithDefault (fin 0) i offs | i <- [0 .. l - 1]], overall)
+  go n offs overall =
+    let i = n `mod` l
+        h = hsVec V.! i
+        h' = rotateMod (offs IM.! i) h
+        sansH = KM.unionWith (+) overall (negate <$> h')
+        k' = bestAlignment sansH h
+        offs' = IM.insert i k' offs
+        overall' = KM.unionWith (+) sansH (rotateMod k' h)
+    in  go (n-1) offs' overall'
 
 -- Random stuff ----
 
