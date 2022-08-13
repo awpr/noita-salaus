@@ -28,9 +28,10 @@ plotHistograms nms h = do
     [ (attenuate k :: Int, getSum <$> vs)
     | (k, vs) <- KM.toList $ KM.unionsWith (++) $ map (fmap pure) h
     ]
-  plot $ return $ plotBars (p & plot_bars_spacing .~ (BarsFixWidth 6))
+  plot $ return $ plotBars (p & plot_bars_spacing .~ BarsFixWidth 6)
 
-plotIoCSweep :: String -> String -> [(Int, Float)] -> EC (Layout Int Float) ()
-plotIoCSweep title param iocs = do
+plotIoCSweep :: String -> [String] -> [(Int, [Float])] -> EC (Layout Int Double) ()
+plotIoCSweep title series iocs = do
   layout_title .= title
-  plot $ points param iocs
+  p <- bars series [(x, map realToFrac ks) | (x, ks) <- iocs]
+  plot $ return $ plotBars (p & plot_bars_spacing .~ BarsFixWidth 6)
