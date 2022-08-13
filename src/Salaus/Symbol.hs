@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -36,7 +37,8 @@ import Data.Type.Attenuation (Attenuable(..), coercible)
 
 
 newtype Symbol n = Symbol { getSymbol :: Fin n }
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum)
+  deriving newtype (Read, Show)
 
 alphabet :: KnownNat n => [Symbol n]
 alphabet = coerce enumFin

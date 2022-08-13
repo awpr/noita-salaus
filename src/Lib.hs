@@ -74,12 +74,12 @@ gammaIoC h = gammaRoC h / uniformRoC @n
 
 -- delta rate-of-coincidence: the rate of coincidences of pairs drawn without
 -- replacement from a sample.
-deltaRoC' :: Histogram a -> RateStats
+deltaRoC' :: Foldable f => f (Sum Int) -> RateStats
 deltaRoC' h = RateStats (getSum $ foldMap (\x -> x * (x - 1)) h) (getSum $ n * (n - 1))
  where
   n = sum h
 
-deltaRoC :: Histogram a -> Float
+deltaRoC :: Foldable f => f (Sum Int) -> Float
 deltaRoC = getRate . deltaRoC'
 
 -- delta index of coincidence

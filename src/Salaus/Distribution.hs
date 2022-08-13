@@ -30,8 +30,8 @@ insertm' k v m = M.alter (Just . \case { Nothing -> v; Just x -> x <> v }) k m
 histogram :: a ⊆ Int => [a] -> Histogram a
 histogram xs = coerce $ foldr (\x m -> insertm x (Sum @Int 1) m) KM.empty xs
 
-histogram' :: Ord a => [a] -> M.Map a Int
-histogram' xs = coerce $ foldr (\x m -> insertm' x (Sum @Int 1) m) M.empty xs
+histogram' :: Ord a => [a] -> M.Map a (Sum Int)
+histogram' xs = foldr (\x m -> insertm' x (Sum @Int 1) m) M.empty xs
 
 toDistribution :: (Functor f, Foldable f) => f (Sum Int) -> f Float
 toDistribution h = fmap (\ (Sum x) -> fromIntegral x / n) h
