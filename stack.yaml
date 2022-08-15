@@ -33,19 +33,25 @@ packages:
 - .
 
 extra-deps:
-  - ../hs/portray/portray
-  - portray-diff-0.1.0.1
-  - portray-prettyprinter-0.2.0
-  - rle-0.1.0.1
+  - git: https://github.com/awpr/portray.git
+    commit: 598a600cebe7f2c59d6db312d69d9c2402eac019
+    subdirs:
+      - portray
+      - portray-diff
+      - portray-prettyprinter
+  - git: https://github.com/awpr/fin-vec.git
+    commit: 73b350bebbc5907382338f2543d701c5b87d716f
+    subdirs:
+      - sint
+      - fin-int
+      - short-vec
   - wrapped-0.1.0.1
-  - fin-int-0.2.0
   - attenuation-0.2.0
-  - sint-0.2.0
-  - short-vec-0.1.0.0
   - git: https://github.com/awpr/niche-containers.git
-    commit: cb26e13c842c310cc5dc367b878b1f747ad55dc3
+    commit: 5b1a08752efd4d951410946d25c486f258d880ab
     subdirs:
       - keyed-containers
+      - rle
   - Chart-diagrams-1.9.4
   - diagrams-postscript-1.5.1
   - statestack-0.3.1

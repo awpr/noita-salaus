@@ -84,7 +84,7 @@ instance KnownNat n => Portray (Symbol n) where
 
   portrayList xs
     | natVal @n Proxy <= natVal @NumGlyphs Proxy = Apply (Name "fromString") [LitStr (toText' xs)]
-    | otherwise = portray xs
+    | otherwise = portray (map getSymbol xs)
 
 blame :: (a -> Maybe b) -> a -> Either a b
 blame f x = maybe (Left x) Right (f x)
